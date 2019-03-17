@@ -27,7 +27,7 @@ requirements: test_environment
 
 ## Make Dataset
 data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py
+	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw/smarthome-userstories-1k.csv /data/processed/smarthome-userstories.csv
 
 ## Delete all compiled Python files
 clean:

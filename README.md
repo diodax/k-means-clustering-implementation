@@ -3,8 +3,27 @@ k-means-clustering-implementation
 
 Implementation of a K-Means clustering algorithm to cluster crowd-acquired user stories about smart home applications.
 
-Project Organization
-------------
+## Setting up locally
+
+Make sure you have [Python](https://www.python.org/) and [pip](https://pip.pypa.io/en/stable/installing/) installed.
+
+```bash
+git clone https://github.com/diodax/k-means-clustering-implementation.git
+cd k-means-clustering-implementation
+pip install -r requirements.txt
+```
+
+## Step 1: Text Pre-processing
+
+```bash
+python src/data/make_dataset.py data/raw/smarthome-userstories-1k.csv /data/processed/smarthome-userstories.csv
+```
+
+The results of the text pre-processing will be saved on the `/data/processed` folder.
+
+## Step 2: TF-IDF Computation and Vector Space Representation
+
+## Project Organization
 
     ├── LICENSE
     ├── Makefile           <- Makefile with commands like `make data` or `make train`
