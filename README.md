@@ -23,6 +23,18 @@ The results of the text pre-processing will be saved on the `/data/processed` fo
 
 ## Step 2: TF-IDF Computation and Vector Space Representation
 
+To generate the table with the TF-IDF scores of each row (user story) in the dataset, execute the following command:
+
+```bash
+python src/models/train_model.py data/processed/smarthome-userstories.csv models/tf-idf-scores.csv
+```
+
+The resulting file with the TF-IDF scores with be saved on the `/models` folder.
+
+## Step 3: K-Means Clustering
+
+[WIP]
+
 ## Project Organization
 
     ├── LICENSE
