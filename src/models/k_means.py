@@ -1,7 +1,6 @@
 import numpy as np
 import random
 import math
-from scipy import spatial
 from statistics import mean
 
 
@@ -29,8 +28,7 @@ def cosine_similarity(a, b):
 
 
 def get_cosine_distance(a, b):
-    # return 1 - cosine_similarity(a, b)
-    return spatial.distance.cosine(a, b)
+    return 1 - cosine_similarity(a, b)
 
 
 class KMeans:

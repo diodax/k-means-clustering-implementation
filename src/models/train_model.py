@@ -75,7 +75,7 @@ def main(input_filepath, output_folder, k):
     dataset = pd.read_csv(input_filepath)
     logger.info('Loaded data file ' + input_filepath + ' with ' + str(len(dataset)) + ' rows')
 
-    # Removes the first column and formats it like a list                  
+    # Removes the first column and formats it like a list
     x = dataset.drop(dataset.columns[0], axis=1).values
     vector_dict = generate_vector_dict(dataset)
 
