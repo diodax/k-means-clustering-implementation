@@ -1,157 +1,119 @@
 # -*- coding: utf-8 -*-
 import click
 import logging
-from dotenv import find_dotenv, load_dotenv
-import math
 import pandas as pd
-import copy
+from k_means import KMeans
+import os.path
+
+# String constants
+PLOT_TABLE_FILENAME = 'k-means-plot-results.csv'
+MODEL_REPORT_FILENAME = 'k-means-results.txt'
 
 
-def get_vocabulary_set(dataset):
-    """ Create the keyword associated to the position of the elements within the document vectors """
-    vocabulary_string = ""
-    for column in dataset:
-        if column != 'id':
-            column_list = dataset[column].tolist()
-            vocabulary_string = vocabulary_string + " ".join(map(str, column_list))
-
-    tokens = vocabulary_string.split(' ')
-    vocabulary_set = set(tokens)
-    return vocabulary_set
-
-
-def get_vector_bow(row):
-    """ Given a dataframe row with an user story, return the bag of words (BoW) across the
-        'Role', 'Feature' and 'Benefit' columns of that user story
+def generate_report(clusters, sse_score, msc_score, filepath):
     """
-    bow_role = str(row['role']).split(' ')
-    bow_feature = str(row['feature']).split(' ')
-    bow_benefit = str(row['benefit']).split(' ')
-
-    bow_total = set(bow_role).union(set(bow_feature)).union(set(bow_benefit))
-    return bow_total
-
-
-def populate_vector_dimensions(vector_dict, dataset):
+    Generates the txt file at filepath with the clustering results.
     """
-    Returns a vector dictionary with the dimension values populated based on the dataset info
+    with open(filepath, 'w') as file:
+        for key, value in clusters.items():
+            # Print the header for the cluster
+            file.write("Cluster " + str(key) + ": ")
+            # Print the IDs for the user stories inside that cluster
+            user_stories_list = []
+            for i in value:
+                value_text = str(int(i))
+                user_stories_list.append(value_text)
+            user_stories_string = ", ".join(user_stories_list)
+            file.write(user_stories_string + "\n")
+        file.write("SSE: " + str(sse_score) + ", MSC: " + str(msc_score) + "\n")
+
+
+def create_plot_results_table():
+    data = []
+    k_range = range(2,11)
+    for i in k_range:
+        data.append([i, 0, 0])
+    df = pd.DataFrame(data, columns=['K Size', 'SSE Score', 'MSC Score'], dtype=float)
+    df.set_index('K Size', inplace=True)
+    return df
+
+
+def update_plot_results_table(df, tuple_k_scores):
+    k_size = tuple_k_scores[0]
+    df.loc[[k_size], ['SSE Score']] = tuple_k_scores[1]
+    df.loc[[k_size], ['MSC Score']] = tuple_k_scores[2]
+    return df
+
+
+def generate_vector_dict(dataset):
     """
-    vector_dict_copy = copy.deepcopy(vector_dict)
-    for index, row in dataset.iterrows():
-        bow = get_vector_bow(row)
-        for word in bow:
-            vector_id = row['id']
-            vector_dict_copy[vector_id][word] = vector_dict_copy[vector_id][word] + 1
-    return vector_dict_copy
-
-
-def compute_tf(vector, bow):
+    Generates a dictionary that uses the user story vectors (tuples) as keys, with the user story IDs as values.
     """
-    Computes the Term Frequency of a vector, where:
-        tf(w) = (Number of times the word appears in a user story) / (Total number of words in the user story)
-    """
-    tf_dict = {}
-    bow_count = len(bow)
-    for word, count in vector.items():
-        tf_dict[word] = count / float(bow_count)
-    return tf_dict
+    vector_dict = {}
+    dataset_list = dataset.values.tolist()
 
-
-def compute_idf(dataset):
-    """
-    Computes the Inverse Document Frequency of all words, where:
-        idf(w) = log(Number of user stories / Number of user stories that contain word w )
-    """
-    total_rows = len(dataset)
-
-    # counts the number of documents that contain a word w
-    idf_dict = dict.fromkeys(get_vocabulary_set(dataset), 0)
-    for index, row in dataset.iterrows():
-        # the fuck is this
-        bow_row = get_vector_bow(row)
-        for word in bow_row:
-            idf_dict[word] += 1
-
-    # divide total_rows by denominator above, take the log of that
-    for word, val in idf_dict.items():
-        if float(val) > 0:
-            idf_dict[word] = math.log(total_rows / float(val))
-
-    return idf_dict
-
-
-def compute_tfidf(tf_bow, idfs):
-    """
-    Computes the TF-IDF of a user story, based on the TF and IDF results
-    """
-    tfidf = {}
-    for word, val in tf_bow.items():
-        tfidf[word] = val * idfs[word]
-    return tfidf
+    for row in dataset_list:
+        id = row[0]
+        vector = row[1:]
+        vector_dict[tuple(vector)] = id
+    return vector_dict
 
 
 @click.command()
 @click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path())
-def main(input_filepath, output_filepath):
+@click.argument('output_folder', type=click.Path())
+@click.option('--k', default=3, help='Number of centroids.')
+def main(input_filepath, output_folder, k):
     """
-    Starting point of the project. Receives the location of the dataset as a
+    Receives the location of the tf-idf scores as a
     command-line Path argument.
     """
     logger = logging.getLogger(__name__)
-    logger.info('Making final data set from raw data')
+    logger.info('Training the K-Means clustering algorithm based on the TF-IDF scores')
 
-    # Get the data/processed/smarthome-userstories.csv file
-    # Also excludes the last column from each row due to extra commas on the csv
-    dataset = pd.read_csv(input_filepath, usecols=['id', 'role', 'feature', 'benefit'])
+    # Get the models/tf-idf-scores.csv file
+    dataset = pd.read_csv(input_filepath)
     logger.info('Loaded data file ' + input_filepath + ' with ' + str(len(dataset)) + ' rows')
 
-    # Generates the set with all the words used across all user stories
-    vocabulary_set = get_vocabulary_set(dataset)
+    # Removes the first column and formats it like a list                  
+    x = dataset.drop(dataset.columns[0], axis=1).values
+    vector_dict = generate_vector_dict(dataset)
 
-    # List of vector dictionaries, in which each vector is a user story
-    # Each vector has another dictionary with vector dimensions of each word from the vocabulary set
-    vector_dict = dict.fromkeys(dataset['id'].tolist())
+    # Number of clusters and max. number of iterations
+    km = KMeans(k=k, max_iterations=500)
+    km.fit(x)
+    clusters = km.get_clusters(vector_dict)
 
-    for key, value in vector_dict.items():
-        vector_dict[key] = dict.fromkeys(vocabulary_set, 0)
+    # Based on the value of K used, change the destination filename
+    filepath_list = (output_folder + MODEL_REPORT_FILENAME).rsplit('.', 1)
+    output_filepath = filepath_list[0] + '-' + str(k) + '.' + filepath_list[1]
 
-    logger.info('Populating the user story vectors based on the dataset...')
-    vector_dict_populated = populate_vector_dimensions(vector_dict, dataset)
-    idfs = compute_idf(dataset)
+    # Calculate SSE and MSC
+    sse_score = km.get_sse_score()
+    logger.info('SSE Score: ' + str(sse_score))
+    msc_score = km.get_msc_avg()
+    logger.info('MSC Score: ' + str(msc_score))
 
-    # Generate the tf-idf scores dictionary
-    logger.info('Generating the TF-IDF scores for each vector...')
-    tfidf_scores_dict = {}
-    for index, row in dataset.iterrows():
-        row_id = row['id']
-        tf_bow = compute_tf(vector_dict_populated[row_id], get_vector_bow(row))
-        tfidf_bow = compute_tfidf(tf_bow, idfs)
-        tfidf_scores_dict[row_id] = tfidf_bow
+    # Generate the results report
+    generate_report(clusters, sse_score, msc_score, output_filepath)
+    logger.info('Created report file on ' + output_filepath)
 
-    # Generate new DataFrame with the TF-IDF scores
-    logger.info('Saving TF-IDF scores in a new .csv file...')
-    tfidf_scores = []
-    tfidf_ids = []
-    for data in tfidf_scores_dict.items():
-        tfidf_ids.append(data[0])
-        tfidf_scores.append(data[1])
-    dataframe_scores = pd.DataFrame(tfidf_scores, index=tfidf_ids, columns=get_vocabulary_set(dataset))
-
-    # Save the TF-IDF scores on data models/tf-idf-scores.csv
-    logger.info('Saved processed scores on ' + output_filepath + ' with ' + str(len(dataset)) + ' rows')
-    dataframe_scores.to_csv(output_filepath, encoding='utf-8')
+    # Generate / Update the results table for future plots
+    if os.path.isfile(output_folder + PLOT_TABLE_FILENAME):
+        # Update the existing file
+        dataset = pd.read_csv(output_folder + PLOT_TABLE_FILENAME)
+        dataset.set_index('K Size', inplace=True)
+        k_means_results = update_plot_results_table(dataset, (k, sse_score, msc_score))
+    else:
+        # Create and update the file
+        dataset = create_plot_results_table()
+        k_means_results = update_plot_results_table(dataset, (k, sse_score, msc_score))
+    k_means_results.to_csv(output_folder + PLOT_TABLE_FILENAME, encoding='utf-8')
+    logger.info('Updated report table on ' + output_folder + PLOT_TABLE_FILENAME)
 
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-    # not used in this stub but often useful for finding various files
-    # project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
 
     main()

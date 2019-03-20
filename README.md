@@ -26,19 +26,24 @@ The results of the text pre-processing will be saved on the `/data/processed` fo
 To generate the table with the TF-IDF scores of each row (user story) in the dataset, execute the following command:
 
 ```bash
-python src/models/train_model.py data/processed/smarthome-userstories.csv models/tf-idf-scores.csv
+python src/features/build_features.py data/processed/smarthome-userstories.csv models/tf-idf-scores.csv
 ```
 
 The resulting file with the TF-IDF scores with be saved on the `/models` folder.
 
 ## Step 3: K-Means Clustering
 
-[WIP]
+To generate the clusters and print the algorithm results, execute:
+
+```bash
+python src/models/train_model.py models/tf-idf-scores.csv reports/ --k=2
+```
+
+The report will be created on the `/reports` folder.
 
 ## Project Organization
 
     ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
     ├── README.md          <- The top-level README for developers using this project.
     ├── data
     │   ├── external       <- Data from third party sources.
@@ -49,12 +54,6 @@ The resulting file with the TF-IDF scores with be saved on the `/models` folder.
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
     │
     ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
     │
     ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
     │   └── figures        <- Generated graphics and figures to be used in reporting
